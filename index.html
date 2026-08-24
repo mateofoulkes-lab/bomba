@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#202a30">
+<title>BONBA</title><link rel="stylesheet" href="styles.css"></head>
+<body><main class="app"><div class="frame">
+<section class="screen active" data-screen="waiting"><div class="plate"><div class="title">UNIDAD DESCONOCIDA</div><div class="pip">PIP · PIP · PIP</div></div><button id="callBombSquad" class="main-call">LLAME AL ESCUADRÓN ANTIBOMBAS PARA SILENCIAR</button><div class="status">SEÑAL ACÚSTICA ACTIVA</div></section>
+<section class="screen video" data-screen="video"><div class="title">CANAL DE EMERGENCIA · CONEXIÓN ESTABLECIDA</div><div id="subtitle" class="subtitles">— ¿Hola? Sí, te veo. Tranquila... vamos a revisar el dispositivo.</div></section>
+<section class="screen error" data-screen="error"><div class="title">ERROR</div><div class="subtitle">PROTOCOLO FALLIDO</div></section>
+<section class="screen module" data-screen="switches"><div class="plate"><div class="title">PALANQUITAS Y CABLES</div></div><div class="module-body"><div class="lcd">CONSULTE EL MANUAL</div><div class="hint">CONFIGURE LAS PALANCAS Y CORTE EL CABLE CORRECTO</div></div></section>
+<section class="screen module" data-screen="symbols"><div class="plate"><div class="title">BOTONES DE SÍMBOLOS</div></div><div class="module-body"><div id="symbolGrid" class="symbol-grid"></div><div class="hint">ILUMINA EL PASADO</div><div id="symbolProgress" class="status">0 / 3</div></div></section>
+<section class="screen module" data-screen="morse"><div class="plate"><div class="title">MORSE</div></div><div class="module-body"><div class="lock"><div class="wheel"></div><div class="wheel"></div><div class="wheel"></div><div class="wheel"></div><div class="wheel"></div><div class="lock-button"></div></div><div class="lcd">·· --- ·-· ... ·</div><div class="hint">EL CÓDIGO FINAL ABRE EL CANDADO</div></div></section>
+<section class="screen module" data-screen="opened"><div class="plate"><div class="title">CONTENEDOR ABIERTO</div></div><div class="module-body"><div class="waiting-final">DISPOSITIVO AÚN ACTIVO</div><div class="pip">PIP · PIP · PIP</div><div class="status">ESPERANDO DESACTIVACIÓN FÍSICA</div></div></section>
+<section class="screen final" data-screen="final"><div class="title">BOMBA DESACTIVADA</div><div class="subtitle">FELIZ CUMPLEAÑOS DANI ♥</div></section>
+<button id="operatorHotspot" class="operator-hotspot" aria-label=""></button>
+<div id="operator" class="operator"><h3>MODO OPERADOR</h3><div id="operatorButtons" class="operator-grid"></div><div id="debug" class="debug"></div></div>
+</div></main><script src="app.js"></script></body></html>
