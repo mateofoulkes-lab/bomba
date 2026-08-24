@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Simulador BONBA</title><link rel="stylesheet" href="styles.css"></head>
+<body class="sim"><main><h1>SIMULADOR DE BOMBA FÍSICA</h1><p>Abra esta página y <code>index.html</code> en dos pestañas. Todo se comunica por almacenamiento local del navegador.</p>
+<section class="sim-panel"><h2>Palancas</h2><div id="switches" class="switches"></div></section>
+<section class="sim-panel"><h2>Cables</h2><div id="wires" class="row"></div></section>
+<section class="sim-panel"><h2>Botones físicos</h2><div class="row"><button id="redButton">BOTÓN ROJO</button><button id="finalButton">DESATIBAR BONBA</button></div></section>
+<section class="sim-panel"><h2>Control rápido</h2><div class="row"><button data-go="waiting">Espera</button><button data-go="video">Video</button><button data-go="switches">Palancas</button><button data-go="symbols">Símbolos</button><button data-go="morse">Morse</button><button data-go="opened">Caja abierta</button><button data-go="final">Final</button><button id="reset">RESET TOTAL</button></div></section>
+<section class="sim-panel"><h2>Estado</h2><pre id="stateView" class="debug"></pre></section>
+<script src="simulator.js"></script></main></body></html>
