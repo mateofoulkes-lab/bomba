@@ -37,9 +37,15 @@ public class MainActivity extends android.app.Activity {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (!ACTION_USB_PERMISSION.equals(intent.getAction())) return;
-            UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+            UsbDevice device;
+            if (Build.VERSION.SDK_INT >= 33) {
+                device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice.class);
+            } else {
+                device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+            }
             boolean granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
             if (granted && device != null) {
+                emitStatus("PERMISO USB CONCEDIDO");
                 openDevice(device);
             } else {
                 emitStatus("PERMISO USB DENEGADO");
@@ -67,7 +73,8 @@ public class MainActivity extends android.app.Activity {
 
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
         if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            // El permiso USB vuelve desde UsbManager, fuera del proceso de la app.
+            registerReceiver(usbReceiver, filter, Context.RECEIVER_EXPORTED);
         } else {
             registerReceiver(usbReceiver, filter);
         }
@@ -96,23 +103,40 @@ public class MainActivity extends android.app.Activity {
     }
 
     private void findAndRequestDevice() {
-        List<UsbSerialDriver> drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager);
-        if (drivers.isEmpty()) {
-            emitStatus("NO SE ENCONTRÓ UN NANO USB SERIAL COMPATIBLE");
-            return;
-        }
+        try {
+            emitStatus("BUSCANDO NANO…");
+            List<UsbSerialDriver> drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager);
+            if (drivers.isEmpty()) {
+                emitStatus("NO SE ENCONTRÓ UN NANO USB SERIAL COMPATIBLE");
+                return;
+            }
 
-        UsbDevice device = drivers.get(0).getDevice();
-        if (usbManager.hasPermission(device)) {
-            openDevice(device);
-            return;
-        }
+            UsbDevice device = drivers.get(0).getDevice();
+            emitStatus("USB ENCONTRADO · VID " + device.getVendorId() + " · PID " + device.getProductId());
 
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) flags |= PendingIntent.FLAG_MUTABLE;
-        PendingIntent permissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), flags);
-        usbManager.requestPermission(device, permissionIntent);
-        emitStatus("ESPERANDO PERMISO USB…");
+            if (usbManager.hasPermission(device)) {
+                openDevice(device);
+                return;
+            }
+
+            // Android 14+ no permite PendingIntent mutable + intent implícito.
+            // Hacerlo explícito al paquete evita el crash al pedir permiso USB.
+            Intent permissionBroadcast = new Intent(ACTION_USB_PERMISSION);
+            permissionBroadcast.setPackage(getPackageName());
+
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                flags |= PendingIntent.FLAG_MUTABLE;
+            }
+
+            PendingIntent permissionIntent = PendingIntent.getBroadcast(
+                    this, 0, permissionBroadcast, flags);
+
+            emitStatus("PIDIENDO PERMISO USB…");
+            usbManager.requestPermission(device, permissionIntent);
+        } catch (Throwable e) {
+            emitStatus("ERROR AL PEDIR USB: " + e.getClass().getSimpleName() + " · " + safeMessage(e));
+        }
     }
 
     private synchronized void openDevice(UsbDevice device) {
@@ -137,6 +161,12 @@ public class MainActivity extends android.app.Activity {
                 return;
             }
 
+            if (selected.getPorts().isEmpty()) {
+                emitStatus("EL DRIVER NO EXPONE PUERTOS SERIE");
+                closeSerial();
+                return;
+            }
+
             serialPort = selected.getPorts().get(0);
             serialPort.open(connection);
             serialPort.setParameters(BAUD, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
@@ -146,10 +176,10 @@ public class MainActivity extends android.app.Activity {
             emitStatus("CONECTADO · " + selected.getDevice().getDeviceName());
             startReader();
 
-            // El Nano puede reiniciarse al abrir el puerto. Pedimos estado un momento después.
-            webView.postDelayed(() -> sendSerial("ESTADO"), 1200);
-        } catch (Exception e) {
-            emitStatus("ERROR USB: " + e.getMessage());
+            // El Nano suele reiniciarse al abrir el puerto.
+            webView.postDelayed(() -> sendSerial("ESTADO"), 1500);
+        } catch (Throwable e) {
+            emitStatus("ERROR USB: " + e.getClass().getSimpleName() + " · " + safeMessage(e));
             closeSerial();
         }
     }
@@ -165,8 +195,8 @@ public class MainActivity extends android.app.Activity {
             try {
                 byte[] bytes = (command.trim() + "\n").getBytes(StandardCharsets.UTF_8);
                 port.write(bytes, 1000);
-            } catch (Exception e) {
-                emitStatus("ERROR AL ENVIAR: " + e.getMessage());
+            } catch (Throwable e) {
+                emitStatus("ERROR AL ENVIAR: " + safeMessage(e));
             }
         }, "usb-writer").start();
     }
@@ -192,8 +222,8 @@ public class MainActivity extends android.app.Activity {
                         pending.delete(0, newline + 1);
                         if (!line.isEmpty()) emitData(line);
                     }
-                } catch (Exception e) {
-                    if (reading.get()) emitStatus("USB DESCONECTADO");
+                } catch (Throwable e) {
+                    if (reading.get()) emitStatus("USB DESCONECTADO · " + safeMessage(e));
                     break;
                 }
             }
@@ -210,6 +240,11 @@ public class MainActivity extends android.app.Activity {
     private void emitData(String data) {
         runOnUiThread(() -> webView.evaluateJavascript(
                 "window.usbBridgeData && window.usbBridgeData(" + jsString(data) + ");", null));
+    }
+
+    private String safeMessage(Throwable e) {
+        String m = e.getMessage();
+        return m == null || m.trim().isEmpty() ? "sin detalle" : m;
     }
 
     private String jsString(String value) {
