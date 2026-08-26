@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>USB Test Nano</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:#111;color:#eee;font-family:system-ui,-apple-system,sans-serif;display:grid;place-items:center}
+  main{width:min(92vw,560px);background:#1b1b1b;border:1px solid #555;border-radius:14px;padding:22px}
+  h1{margin:0 0 8px;font-size:1.4rem}
+  .small{font-size:.9rem;opacity:.8;line-height:1.35}
+  #diag,#log{margin:14px 0;padding:12px;border:1px solid #555;border-radius:8px;background:#0d0d0d;font-family:monospace;white-space:pre-wrap;word-break:break-word}
+  #diag{min-height:92px}
+  #log{min-height:120px;max-height:240px;overflow:auto}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  button{min-height:52px;border-radius:9px;border:1px solid #777;font-weight:700;font-size:1rem}
+  #connect{grid-column:1/-1}
+</style>
+</head>
+<body>
+<main>
+  <h1>Arduino Nano · Web Serial</h1>
+  <div class="small">Prueba directa desde GitHub Pages/HTTPS. Conectá el Nano por OTG antes de tocar el botón.</div>
+
+  <div id="diag"></div>
+
+  <div class="grid">
+    <button id="connect">CONECTAR NANO</button>
+    <button data-cmd="INICIAR">INICIAR</button>
+    <button data-cmd="PAUSA">PAUSA</button>
+    <button data-cmd="RESET">RESET 90:45</button>
+    <button data-cmd="ESTADO">PEDIR ESTADO</button>
+  </div>
+
+  <div id="log">Sin conexión.</div>
+</main>
+
+<script>
+let port=null,writer=null,reader=null,reading=false;
+const diag=document.querySelector('#diag');
+const logBox=document.querySelector('#log');
+
+function setDiag(){
+  const lines=[];
+  lines.push('HTTPS/contexto seguro: '+(window.isSecureContext?'SI':'NO'));
+  lines.push('navigator.serial: '+(('serial' in navigator)?'DISPONIBLE':'NO DISPONIBLE'));
+  lines.push('User-Agent: '+navigator.userAgent);
+  diag.textContent=lines.join('\n');
+}
+setDiag();
+
+function log(msg){
+  const stamp=new Date().toLocaleTimeString();
+  logBox.textContent='['+stamp+'] '+msg+'\n'+logBox.textContent;
+}
+
+async function connect(){
+  if(!('serial' in navigator)){
+    log('Este navegador no expone Web Serial.');
+    return;
+  }
+  try{
+    log('Abriendo selector de dispositivos USB…');
+    port=await navigator.serial.requestPort();
+    const info=port.getInfo ? port.getInfo() : {};
+    log('Puerto elegido. VID='+(info.usbVendorId??'?')+' PID='+(info.usbProductId??'?'));
+    await port.open({baudRate:115200});
+
+    const encoder=new TextEncoderStream();
+    encoder.readable.pipeTo(port.writable);
+    writer=encoder.writable.getWriter();
+
+    log('PUERTO ABIERTO A 115200.');
+    startRead();
+    setTimeout(()=>send('ESTADO'),1200);
+  }catch(e){
+    log('ERROR: '+(e?.name||'')+' '+(e?.message||e));
+  }
+}
+
+async function startRead(){
+  if(!port||reading)return;
+  reading=true;
+  const decoder=new TextDecoderStream();
+  port.readable.pipeTo(decoder.writable);
+  reader=decoder.readable.getReader();
+  let pending='';
+  try{
+    while(true){
+      const {value,done}=await reader.read();
+      if(done)break;
+      if(!value)continue;
+      pending+=value;
+      const lines=pending.split(/\r?\n/);
+      pending=lines.pop();
+      for(const line of lines){if(line.trim())log('NANO: '+line.trim());}
+    }
+  }catch(e){
+    log('LECTURA TERMINADA: '+(e?.message||e));
+  }finally{
+    reading=false;
+    try{reader.releaseLock()}catch{}
+  }
+}
+
+async function send(cmd){
+  if(!writer){log('No hay puerto abierto.');return;}
+  try{
+    await writer.write(cmd+'\n');
+    log('> '+cmd);
+  }catch(e){
+    log('ERROR ENVIANDO: '+(e?.message||e));
+  }
+}
+
+document.querySelector('#connect').addEventListener('click',connect);
+document.querySelectorAll('[data-cmd]').forEach(btn=>btn.addEventListener('click',()=>send(btn.dataset.cmd)));
+</script>
+</body>
+</html>
