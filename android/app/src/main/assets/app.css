@@ -1,0 +1,59 @@
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#050505;color:#f3f3f3;font-family:"Courier New",monospace;touch-action:manipulation}
+button,input{font:inherit}
+button{cursor:pointer}
+#touchSurface{position:fixed;inset:0;z-index:2;pointer-events:none}
+#gameViewport{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center;background:radial-gradient(circle at center,#161616 0,#080808 65%,#000 100%)}
+#gameFrame{position:relative;width:1280px;height:720px;transform-origin:center center;transition:transform .12s linear}
+#gameFrame.guide{outline:5px dashed #ffcc00;outline-offset:-8px}
+.screen{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:58px 88px;gap:24px}
+.screen.active{display:flex}
+.eyebrow{font-size:24px;letter-spacing:.18em;opacity:.6}
+h1{font-size:54px;line-height:1.02;margin:0;letter-spacing:.04em}
+h2,h3{margin:0}
+.instruction{font-size:34px;margin:0;letter-spacing:.05em}
+.primary{border:3px solid #ddd;background:#111;color:#fff;padding:18px 30px;font-size:24px;font-weight:800;box-shadow:0 0 0 4px #111,0 0 0 6px #777}
+.primary:active{transform:translateY(2px)}
+.giant{max-width:760px;font-size:28px;padding:30px}
+.statusline{position:absolute;bottom:28px;font-size:17px;opacity:.45}
+#soquetinVideo{width:100%;height:100%;object-fit:contain;background:#000}
+.fallback{border:3px dashed #999;padding:30px}
+.hidden{display:none!important}
+.waitBadge{position:absolute;bottom:55px;padding:15px 25px;background:#111;border:2px solid #fff;font-size:22px}
+.pulseDot{width:24px;height:24px;border-radius:50%;background:#fff;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.15;transform:scale(.7)}}
+.progressSlots{display:flex;gap:18px}
+.progressSlots span{width:46px;height:14px;border:2px solid #aaa}
+.progressSlots span.on{background:#fff}
+.symbolGrid{width:900px;display:grid;grid-template-columns:repeat(8,1fr);gap:14px}
+.symbolBtn{height:145px;background:#ededed;border:4px solid #111;box-shadow:0 0 0 2px #aaa;color:#111;display:grid;place-items:center;font-size:52px;font-weight:800}
+.symbolBtn img{max-width:72%;max-height:72%;object-fit:contain}
+.symbolBtn:active{transform:scale(.97);background:#ccc}
+.codeDisplay{min-width:530px;min-height:86px;border:4px solid #ddd;background:#0a0a0a;font-size:58px;letter-spacing:.12em;padding:10px 20px}
+.keypad{display:grid;grid-template-columns:repeat(3,145px);gap:14px}
+.keypad button{height:78px;font-size:32px;border:2px solid #aaa;background:#171717;color:#fff}
+.letterPicker{display:flex;gap:25px;align-items:center}
+.letterCol{display:grid;grid-template-rows:55px 100px 55px;width:120px;gap:9px}
+.letterCol button{background:#111;color:#fff;border:2px solid #aaa;font-size:31px}
+.letterValue{display:grid;place-items:center;background:#eee;color:#111;border:4px solid #111;font-size:58px;font-weight:900}
+.feedback{min-height:30px;font-size:22px}
+.success{font-size:66px}
+.admin{position:fixed;inset:0;z-index:50;background:rgba(4,4,4,.96);overflow:auto;padding:18px;color:#eee}
+.adminHeader{position:sticky;top:0;z-index:2;background:#090909;display:flex;align-items:center;justify-content:space-between;padding:10px 4px 16px;border-bottom:1px solid #555}
+.adminHeader h2{font-size:24px}
+.admin button{background:#222;color:#fff;border:1px solid #777;border-radius:5px;padding:10px 12px;min-height:42px}
+.admin button.accent{background:#eee;color:#111;font-weight:900}
+.adminGrid{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));gap:12px;margin-top:12px}
+.adminCard{border:1px solid #666;background:#111;padding:14px;display:flex;flex-direction:column;gap:10px}
+.adminCard h3{font-size:17px;letter-spacing:.08em}
+.jumpGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
+.buttonRow{display:flex;gap:7px;flex-wrap:wrap}
+.buttonRow>*{flex:1}
+.timeRow{display:flex;align-items:center;gap:8px}
+.timeRow input{width:90px;background:#050505;color:#fff;border:1px solid #777;padding:9px;text-align:center;font-size:20px}
+.adminStatus{padding:9px;background:#050505;border:1px solid #555;font-size:13px}
+.calValue{font-size:13px;opacity:.8}
+.dpad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.serialLog{min-height:105px;max-height:180px;overflow:auto;white-space:pre-wrap;background:#050505;border:1px solid #444;padding:8px;font-size:12px}
+.admin label{font-size:13px}
+@media(max-width:950px){.adminGrid{grid-template-columns:repeat(2,minmax(230px,1fr))}}
