@@ -9,13 +9,13 @@ import android.content.pm.ActivityInfo;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
-import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -31,29 +31,31 @@ import com.hoho.android.usbserial.util.SerialInputOutputManager;
 
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-/**
- * Final birthday-game activity.
- * Keeps the already-proven usb-serial-for-android approach, but exposes it to
- * the HTML game through a tiny JavaScript bridge.
- */
 public class FinalActivity extends AppCompatActivity implements SerialInputOutputManager.Listener {
     private static final String ACTION_USB_PERMISSION = "com.cochinoca.bombausb.USB_PERMISSION_FINAL";
     private static final int BAUD = 115200;
+    private static final int PICK_MEDIA = 4107;
 
     private WebView webView;
     private UsbManager usbManager;
     private UsbSerialPort serialPort;
     private SerialInputOutputManager ioManager;
-    private StringBuilder rxBuffer = new StringBuilder();
+    private final StringBuilder rxBuffer = new StringBuilder();
     private boolean receiverRegistered = false;
+    private String pendingMediaSlot = null;
 
     private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             if (!ACTION_USB_PERMISSION.equals(intent.getAction())) return;
-            UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+            UsbDevice device;
+            if (Build.VERSION.SDK_INT >= 33) device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice.class);
+            else device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
             boolean granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
             if (granted && device != null) openDevice(device);
             else jsUsbState("permiso USB rechazado");
@@ -78,8 +80,11 @@ public class FinalActivity extends AppCompatActivity implements SerialInputOutpu
         s.setAllowFileAccess(true);
         s.setAllowContentAccess(true);
         s.setMediaPlaybackRequiresUserGesture(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            s.setAllowFileAccessFromFileURLs(true);
+            s.setAllowUniversalAccessFromFileURLs(true);
+        }
         webView.setWebViewClient(new WebViewClient());
-        webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new Bridge(), "Android");
         webView.loadUrl("file:///android_asset/final/index.html");
     }
@@ -117,8 +122,10 @@ public class FinalActivity extends AppCompatActivity implements SerialInputOutpu
         UsbSerialDriver driver = drivers.get(0);
         UsbDevice device = driver.getDevice();
         if (!usbManager.hasPermission(device)) {
-            int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : 0;
-            PendingIntent pi = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION).setPackage(getPackageName()), flags);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) flags |= PendingIntent.FLAG_MUTABLE;
+            PendingIntent pi = PendingIntent.getBroadcast(this, 0,
+                    new Intent(ACTION_USB_PERMISSION).setPackage(getPackageName()), flags);
             usbManager.requestPermission(device, pi);
             jsUsbState("esperando permiso USB");
             return;
@@ -161,6 +168,70 @@ public class FinalActivity extends AppCompatActivity implements SerialInputOutpu
         }
     }
 
+    private boolean validMediaSlot(String slot) {
+        return slot != null && (slot.equals("soquetin") || slot.equals("pip") || slot.equals("musica") ||
+                slot.equals("victoria") || slot.equals("cumple") || slot.equals("error") || slot.equals("boom"));
+    }
+
+    private String mediaExtension(String slot) {
+        return "soquetin".equals(slot) ? ".mp4" : ".mp3";
+    }
+
+    private File mediaFile(String slot) {
+        File dir = new File(getFilesDir(), "bomba_media");
+        if (!dir.exists()) dir.mkdirs();
+        return new File(dir, slot + mediaExtension(slot));
+    }
+
+    private void pickMedia(String slot) {
+        if (!validMediaSlot(slot)) return;
+        pendingMediaSlot = slot;
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("soquetin".equals(slot) ? "video/*" : "audio/*");
+        startActivityForResult(i, PICK_MEDIA);
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != PICK_MEDIA || resultCode != RESULT_OK || data == null || data.getData() == null) {
+            pendingMediaSlot = null;
+            immersive();
+            return;
+        }
+        final String slot = pendingMediaSlot;
+        pendingMediaSlot = null;
+        if (!validMediaSlot(slot)) return;
+        Uri uri = data.getData();
+        try {
+            File out = mediaFile(slot);
+            try (InputStream in = getContentResolver().openInputStream(uri);
+                 FileOutputStream fos = new FileOutputStream(out, false)) {
+                if (in == null) throw new Exception("no se pudo abrir el archivo");
+                byte[] buffer = new byte[1024 * 128];
+                int n;
+                while ((n = in.read(buffer)) > 0) fos.write(buffer, 0, n);
+            }
+            toast("Guardado: " + slot);
+            jsMediaSelected(slot, Uri.fromFile(out).toString());
+        } catch (Exception e) {
+            toast("Error copiando medio: " + e.getMessage());
+        }
+        immersive();
+    }
+
+    private String mediaUrl(String slot) {
+        if (!validMediaSlot(slot)) return "";
+        File f = mediaFile(slot);
+        return f.exists() ? Uri.fromFile(f).toString() : "";
+    }
+
+    private void jsMediaSelected(String slot, String url) {
+        if (webView == null) return;
+        runOnUiThread(() -> webView.evaluateJavascript(
+                "window.BombNative&&window.BombNative.onMediaSelected(" + JSONObject.quote(slot) + "," + JSONObject.quote(url) + ");", null));
+    }
+
     @Override public void onNewData(byte[] data) {
         final String chunk = new String(data, StandardCharsets.UTF_8);
         runOnUiThread(() -> {
@@ -175,7 +246,7 @@ public class FinalActivity extends AppCompatActivity implements SerialInputOutpu
     }
 
     private int indexOfNewline(StringBuilder b) {
-        for (int i=0;i<b.length();i++) if (b.charAt(i)=='\n') return i;
+        for (int i = 0; i < b.length(); i++) if (b.charAt(i) == '\n') return i;
         return -1;
     }
 
@@ -190,7 +261,8 @@ public class FinalActivity extends AppCompatActivity implements SerialInputOutpu
 
     private void jsUsbState(String status) {
         if (webView == null) return;
-        runOnUiThread(() -> webView.evaluateJavascript("window.BombNative&&window.BombNative.onUsbState(" + JSONObject.quote(status) + ");", null));
+        runOnUiThread(() -> webView.evaluateJavascript(
+                "window.BombNative&&window.BombNative.onUsbState(" + JSONObject.quote(status) + ");", null));
     }
 
     private void toast(String s) { runOnUiThread(() -> Toast.makeText(this, s, Toast.LENGTH_SHORT).show()); }
@@ -217,5 +289,7 @@ public class FinalActivity extends AppCompatActivity implements SerialInputOutpu
         @JavascriptInterface public void send(String line) { sendSerial(line); }
         @JavascriptInterface public void writeSerial(String line) { sendSerial(line); }
         @JavascriptInterface public void immersive() { runOnUiThread(() -> FinalActivity.this.immersive()); }
+        @JavascriptInterface public void pickMedia(String slot) { runOnUiThread(() -> FinalActivity.this.pickMedia(slot)); }
+        @JavascriptInterface public String mediaUrl(String slot) { return FinalActivity.this.mediaUrl(slot); }
     }
 }
