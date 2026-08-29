@@ -10,7 +10,7 @@ let adminOpen=false, calibrating=false, pauseArmed=false, symbolSeq=[], morse=''
 const CHEAT='123412341234';
 const matrix=[['J','A','H','F','C','B'],['I','J','A','B','C','H'],['F','D','E','A','G','I'],['I','J','A','E','H','J'],['H','D','I','B','C','E']];
 let letterIdx=[0,0,0,0,0];
-const symbolOrder=['S7','B','S2','S9','E','S0','S5','A','S4','S1','F','S8','C','S6','D','S3'];
+const symbolOrder=['S7','S2','S9','S0','S5','S4','S1','S8','S6','S3'];
 const correctSymbols=['S2','S5','S4'];
 const mediaSlots=['soquetin','pip','musica','victoria','cumple','error','boom'];
 const mediaEls={soquetin:video,pip:pip,musica:music,victoria:victory,cumple:birthday,error:errorAudio,boom:boom};
@@ -33,8 +33,9 @@ function onSerial(raw){const line=String(raw||'').trim();if(!line)return;log('RX
  if(/^(CABLE_BAD|CABLE_MAL|CORTE_MAL|WIRE_BAD)/.test(u)&&state.stage==='cables'){penaltyError();return;}
  if(/^(CABLE_OK|CORTE_OK|WIRE_OK|CABLE_CORTADO)/.test(u)&&state.stage==='cables'){go('symbols');return;}
  if(/^(FINAL|DESATIBAR)/.test(u)&&state.stage==='final'){finish();return;}
+ if(/^(BUTTON_DOWN|BOTON_PULSADO|PRESS_DOWN)/.test(u))return;
  if(/(BUTTON_UP|BOTON_SUELTO|RELEASE|SUELTO)/.test(u)){physicalButton('release');return;}
- if(/^(BTN|BOTON|BUTTON|PULSADO|PRESS)/.test(u)){physicalButton('release');}
+ if(/^(BTN|BOTON|BUTTON|PULSADO|PRESS)$/.test(u)){physicalButton('release');}
 }
 function physicalButton(kind){if(state.stage==='video'&&video.paused&&pauseArmed&&kind==='release'){pauseArmed=false;video.play().catch(()=>{});rapidDrainTo(1810,2000);}else if(state.stage==='final'){finish();}}
 function applyTransform(){viewport.style.transform=`translate(calc(-50% + ${state.x}px),calc(-50% + ${state.y}px)) scale(${state.scale})`;save();}
@@ -47,41 +48,51 @@ function startExperience(){stopAll();symbolSeq=[];morse='';letterIdx=[0,0,0,0,0]
 function rapidDrainTo(target,duration){if(rapidTimer)clearInterval(rapidTimer);const from=Math.max(target,timerRemaining());timerPause();const started=Date.now();rapidTimer=setInterval(()=>{const t=Math.min(1,(Date.now()-started)/duration);const eased=t*t*(3-2*t);const cur=Math.round(from+(target-from)*eased);state.timerSeconds=cur;send('TIEMPO:'+cur);if(t>=1){clearInterval(rapidTimer);rapidTimer=null;setTimer(target,true);}},80);}
 function subtractMinute(){const next=Math.max(0,timerRemaining()-60);setTimer(next,state.timerRunning);if(next===0)handleZero();}
 function penaltyError(){try{errorAudio.currentTime=0;errorAudio.play().catch(()=>{});}catch(_){}subtractMinute();}
-function handleZero(){if(zeroHandling||state.stage==='idle'||state.stage==='done')return;zeroHandling=true;state.timerRunning=false;state.timerSeconds=0;state.timerEnd=0;save();send('PAUSA');try{boom.currentTime=0;boom.play().catch(()=>{});}catch(_){}setTimeout(()=>{setTimer(300,true);zeroHandling=false;},120);}
+function handleZero(){
+ if(zeroHandling||state.stage==='idle'||state.stage==='done')return;
+ zeroHandling=true;state.timerRunning=false;state.timerSeconds=0;state.timerEnd=0;save();send('PAUSA');
+ let granted=false;
+ const grantFive=()=>{if(granted||!zeroHandling)return;granted=true;boom.onended=null;boom.onerror=null;setTimer(300,true);zeroHandling=false;};
+ try{
+   boom.pause();boom.currentTime=0;boom.onended=grantFive;boom.onerror=grantFive;
+   const p=boom.play();if(p&&typeof p.catch==='function')p.catch(grantFive);
+ }catch(_){grantFive();}
+}
 setInterval(()=>{if(state.timerRunning){const r=timerRemaining();if(r<=0)handleZero();const live=$('#timerLive');if(live)live.textContent=formatTime(r);}},250);
 function formatTime(s){s=Math.max(0,Math.round(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 function render(){screen.className='panel';video.style.display='none';screen.innerHTML='';
  switch(state.stage){
   case'idle':screen.innerHTML='<div class="title">DISPOSITIVO EN ESPERA</div><div class="subtitle">Ingrese al modo administrador para iniciar.</div>';break;
-  case'initial':screen.innerHTML='<div class="title">ADVERTENCIA</div><button id="call" class="bigButton danger">LLAME AL ESCUADRÓN ANTIBOMBAS PARA SILENCIAR</button>';$('#call').onclick=()=>{pip.pause();pip.currentTime=0;go('video');};break;
+  case'initial':screen.innerHTML='<div class="title">ADVERTENCIA</div><div class="subtitle">CONTACTE A LA DIVISIÓN DE EXPLOSIVOS DE COCHINOCA</div><button id="call" class="callButton"><span class="callIcon">☎</span><span class="callText"><b>LLAMAR</b><small>División Explosivos de Cochinoca</small></span></button>';$('#call').onclick=()=>{pip.pause();pip.currentTime=0;go('video');};break;
   case'video':screen.classList.add('videoScreen');screen.appendChild(video);video.style.display='block';startVideo();break;
   case'cables':if(music.paused){music.currentTime=0;music.play().catch(()=>{});}screen.innerHTML='<div class="title">PALANCAS Y CABLES</div><div class="subtitle">CORTE EL CABLE CORRECTO</div>';break;
   case'symbols':renderSymbols();break;
   case'morse':renderMorse();break;
   case'lock':renderLock();break;
-  case'final':screen.innerHTML='<div class="title">DISPOSITIVO ABIERTO</div><div class="subtitle">Localice y pulse <b>DESATIBAR BONBA</b></div><div class="hint">Esperando botón físico…</div>';break;
+  case'final':screen.innerHTML='<div class="title">DISPOSITIVO ABIERTO</div><div class="subtitle">Mueva la palanca <b>DESATIBAR BONBA</b></div><div class="hint">Esperando palanca física…</div>';break;
   case'done':screen.innerHTML='<div class="success">BOMBA DESATIBADA</div><div class="subtitle">¡FELIZ CUMPLEAÑOS!</div>';break;
  }
  applyTransform();
 }
 function startVideo(){pauseArmed=true;video.currentTime=0;video.play().catch(()=>{});}
 video.addEventListener('timeupdate',()=>{if(state.stage==='video'&&pauseArmed&&video.currentTime>=Number(state.pauseAt||0)){video.pause();}});
+video.addEventListener('play',()=>{if(state.stage==='video'&&pauseArmed&&video.currentTime>=Number(state.pauseAt||0)){setTimeout(()=>{if(pauseArmed)video.pause();},0);}});
 video.addEventListener('ended',()=>{if(state.stage==='video')go('cables');});
-function renderSymbols(){screen.innerHTML='<div class="title">BOTONES DE SÍMBOLOS</div><div class="selectedSlots"><div class="slot"></div><div class="slot"></div><div class="slot"></div></div><div class="symbols" id="symbols"></div>';const box=$('#symbols');symbolOrder.forEach(id=>{const b=document.createElement('button');b.className='key symbolKey';b.dataset.id=id;if(id[0]==='S'){const n=+id.slice(1);b.innerHTML=`<img src="symbols/${n}.png" alt="símbolo ${n}">`;}else b.textContent=id;b.onclick=()=>pickSymbol(id);box.appendChild(b);});updateSymbolSlots();}
+function renderSymbols(){screen.innerHTML='<div class="title">BOTONES DE SÍMBOLOS</div><div class="selectedSlots"><div class="slot"></div><div class="slot"></div><div class="slot"></div></div><div class="symbols" id="symbols"></div>';const box=$('#symbols');symbolOrder.forEach(id=>{const b=document.createElement('button');b.className='symbolKey';b.dataset.id=id;const n=+id.slice(1);b.innerHTML=`<span class="keySlot"></span><img src="symbols/${n}.png" alt="símbolo ${n}">`;b.onclick=()=>pickSymbol(id);box.appendChild(b);});updateSymbolSlots();}
 function pickSymbol(id){symbolSeq.push(id);updateSymbolSlots();if(symbolSeq.length===3){if(symbolSeq.every((x,i)=>x===correctSymbols[i]))setTimeout(()=>go('morse'),250);else setTimeout(()=>{penaltyError();symbolSeq=[];updateSymbolSlots();},250);}}
-function updateSymbolSlots(){document.querySelectorAll('.slot').forEach((el,i)=>{const id=symbolSeq[i];el.innerHTML='';if(!id)return;if(id[0]==='S'){const n=+id.slice(1);el.innerHTML=`<img src="symbols/${n}.png" alt="">`;}else el.textContent=id;});}
+function updateSymbolSlots(){document.querySelectorAll('.slot').forEach((el,i)=>{const id=symbolSeq[i];el.innerHTML='';if(!id)return;const n=+id.slice(1);el.innerHTML=`<img src="symbols/${n}.png" alt="">`;});}
 function renderMorse(){screen.innerHTML='<div class="title">MORSE</div><div class="codeDisplay" id="morseDisplay"></div><div class="keypad" id="keys"></div>';const keys=$('#keys');['1','2','3','4','5','6','7','8','9','⌫','0','OK'].forEach(k=>{const b=document.createElement('button');b.className='key';b.textContent=k;b.onclick=()=>morseKey(k);keys.appendChild(b);});updateMorse();}
 function morseKey(k){if(k==='⌫')morse=morse.slice(0,-1);else if(k==='OK'){if(morse==='4461612')go('lock');else{penaltyError();morse='';}}else if(morse.length<7)morse+=k;updateMorse();}
 function updateMorse(){const e=$('#morseDisplay');if(e)e.textContent=morse||'_______';}
-function renderLock(){screen.innerHTML='<div class="title">CANDADO</div><div class="letterPicker" id="pickers"></div><button id="wordOk" class="bigButton">ENVIAR</button><div id="wordMsg" class="subtitle"></div>';const p=$('#pickers');matrix.forEach((col,c)=>{const d=document.createElement('div');d.className='letterCol';d.innerHTML=`<button class="arrowBtn" data-d="-1">▲</button><div class="letter" id="letter${c}"></div><button class="arrowBtn" data-d="1">▼</button>`;d.querySelectorAll('button').forEach(b=>b.onclick=()=>cycleLetter(c,+b.dataset.d));p.appendChild(d);});$('#wordOk').onclick=checkWord;updateLetters();}
+function renderLock(){screen.innerHTML='<div class="title">CANDADO</div><div class="letterPicker" id="pickers"></div><div class="hint">TOQUE CADA LETRA PARA CAMBIARLA</div><button id="wordOk" class="bigButton">ENVIAR</button><div id="wordMsg" class="subtitle"></div>';const p=$('#pickers');matrix.forEach((col,c)=>{const d=document.createElement('button');d.className='letterKey';d.innerHTML=`<span class="keySlot"></span><span class="letter" id="letter${c}"></span>`;d.onclick=()=>cycleLetter(c,1);p.appendChild(d);});$('#wordOk').onclick=checkWord;updateLetters();}
 function cycleLetter(c,d){letterIdx[c]=(letterIdx[c]+d+matrix[c].length)%matrix[c].length;updateLetters();}
 function updateLetters(){matrix.forEach((col,c)=>{const e=$('#letter'+c);if(e)e.textContent=col[letterIdx[c]];});}
 function currentWord(){return matrix.map((col,c)=>col[letterIdx[c]]).join('');}
 function checkWord(){const m=$('#wordMsg');if(currentWord()==='JADEE'){m.textContent='CÓDIGO ACEPTADO — ABRA EL DISPOSITIVO';setTimeout(()=>go('final'),900);}else{penaltyError();m.textContent='PALABRA NO VÁLIDA';setTimeout(()=>{if(m)m.textContent='';},900);}}
 function finish(){timerPause();music.pause();music.currentTime=0;go('done');victory.currentTime=0;victory.play().catch(()=>{});victory.onended=()=>{birthday.currentTime=0;birthday.play().catch(()=>{});};}
 window.addEventListener('pointerdown',e=>{if(adminOpen)return;const now=Date.now();if(now-lastCheat>2000)cheat='';lastCheat=now;const q=e.clientY<innerHeight/2?(e.clientX<innerWidth/2?'1':'2'):(e.clientX<innerWidth/2?'3':'4');cheat=(cheat+q).slice(-CHEAT.length);if(cheat===CHEAT){cheat='';e.preventDefault();e.stopImmediatePropagation();openAdmin();}},true);
-function openAdmin(){adminOpen=true;admin.classList.remove('hidden');buildAdmin();}
-function closeAdmin(){adminOpen=false;calibrating=false;viewport.classList.remove('calibrating');admin.classList.add('hidden');}
+function openAdmin(){if(state.stage==='video'&&pauseArmed&&video.currentTime>=Number(state.pauseAt||0))video.pause();adminOpen=true;admin.classList.remove('hidden');buildAdmin();}
+function closeAdmin(){adminOpen=false;calibrating=false;viewport.classList.remove('calibrating');admin.classList.add('hidden');if(state.stage==='video'&&pauseArmed&&video.currentTime>=Number(state.pauseAt||0))video.pause();}
 function buildAdmin(){if(!adminOpen)return;admin.innerHTML=`<h1>ADMIN — DESTRUCTOMATIC T47</h1>
 <h2>Experiencia</h2><div class="adminGrid"><button class="adminBtn ok" data-act="start">INICIAR EXPERIENCIA</button><button class="adminBtn danger" data-act="reset">RESET TOTAL</button><button class="adminBtn" data-go="initial">PIP</button><button class="adminBtn" data-go="video">VIDEO</button><button class="adminBtn" data-go="cables">CABLES</button><button class="adminBtn" data-go="symbols">SÍMBOLOS</button><button class="adminBtn" data-go="morse">MORSE</button><button class="adminBtn" data-go="lock">CANDADO</button><button class="adminBtn" data-go="final">FINAL</button></div>
 <h2>Nano / eventos</h2><div class="adminGrid"><button class="adminBtn" data-act="connect">CONECTAR NANO</button><button class="adminBtn" data-act="status">ESTADO</button><button class="adminBtn" data-act="simBtn">SIMULAR BOTÓN</button><button class="adminBtn" data-act="simCable">SIMULAR CORTE OK</button><button class="adminBtn" data-act="simError">SIMULAR ERROR</button><button class="adminBtn" data-act="simFinal">SIMULAR FINAL</button></div><div id="serialStatus" class="status">${state.serialLog||'—'}</div>
