@@ -1,5 +1,6 @@
 package com.cochinoca.bombausb;
 
+import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -21,9 +22,6 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
@@ -37,7 +35,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-public class FinalActivity extends AppCompatActivity implements SerialInputOutputManager.Listener {
+public class FinalActivity extends Activity implements SerialInputOutputManager.Listener {
     private static final String ACTION_USB_PERMISSION = "com.cochinoca.bombausb.USB_PERMISSION_FINAL";
     private static final int BAUD = 115200;
     private static final int PICK_MEDIA = 4107;
@@ -62,7 +60,7 @@ public class FinalActivity extends AppCompatActivity implements SerialInputOutpu
         }
     };
 
-    @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
+    @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
@@ -192,7 +190,7 @@ public class FinalActivity extends AppCompatActivity implements SerialInputOutpu
         startActivityForResult(i, PICK_MEDIA);
     }
 
-    @Override protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != PICK_MEDIA || resultCode != RESULT_OK || data == null || data.getData() == null) {
             pendingMediaSlot = null;
