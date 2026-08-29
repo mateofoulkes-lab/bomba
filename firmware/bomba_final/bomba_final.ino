@@ -9,9 +9,9 @@
 //   TM1637 DIO  -> D5
 //   Botón de Soquetín -> D2 a GND
 //   Cable correcto    -> D3 a GND (intacto = LOW, cortado = HIGH)
-//   DESATIBAR BONBA   -> D6 a GND
+//   Palanca DESATIBAR BONBA -> D6 a GND
 //
-// Todos los pulsadores/sensores usan INPUT_PULLUP.
+// Todas las entradas usan INPUT_PULLUP.
 // No hace falta resistencia externa.
 //
 // Serie USB: 115200 baud.
@@ -26,7 +26,7 @@
 // Eventos que envía a la app:
 //   BUTTON            (al SOLTAR el botón de Soquetín)
 //   CABLE_OK          (cuando se corta el cable correcto)
-//   FINAL             (al pulsar DESATIBAR BONBA)
+//   FINAL             (cuando la palanca final cambia de posición)
 //   TIMER_ZERO        (cuando el contador llega a 00:00)
 //   TIME:<segundos>   (estado/sincronización)
 // ============================================================
@@ -63,6 +63,8 @@ unsigned long cableChangedMs = 0;
 unsigned long finalChangedMs = 0;
 
 bool cableEventSent = false;
+bool finalEventSent = false;
+bool finalArmedState = HIGH; // posición inicial de la palanca final al armar/resetear
 
 void showTime() {
   long s = secondsLeft;
@@ -97,6 +99,9 @@ void resetExperience() {
   timerRunning = true;       // INICIAR EXPERIENCIA manda RESET: el reloj empieza acá.
   zeroReported = false;
   cableEventSent = false;
+  finalEventSent = false;
+  finalArmedState = digitalRead(PIN_FINAL); // la posición actual pasa a ser la posición de armado
+  finalStable = finalRawPrev = finalArmedState;
   lastTickMs = millis();
   showTime();
   Serial.println(F("RESET_OK"));
@@ -221,8 +226,8 @@ void updateCable() {
   }
 }
 
-void updateFinalButton() {
-  bool raw = digitalRead(PIN_FINAL); // HIGH = suelto, LOW = pulsado
+void updateFinalLever() {
+  bool raw = digitalRead(PIN_FINAL);
   unsigned long now = millis();
 
   if (raw != finalRawPrev) {
@@ -232,7 +237,11 @@ void updateFinalButton() {
 
   if (raw != finalStable && (unsigned long)(now - finalChangedMs) >= DEBOUNCE_MS) {
     finalStable = raw;
-    if (finalStable == LOW) {
+
+    // La orientación física no importa: RESET memoriza la posición inicial.
+    // El primer cambio estable hacia la posición opuesta dispara el final una sola vez.
+    if (!finalEventSent && finalStable != finalArmedState) {
+      finalEventSent = true;
       Serial.println(F("FINAL"));
     }
   }
@@ -251,6 +260,7 @@ void setup() {
   buttonStable = buttonRawPrev = digitalRead(PIN_BUTTON);
   cableStable  = cableRawPrev  = digitalRead(PIN_CABLE);
   finalStable  = finalRawPrev  = digitalRead(PIN_FINAL);
+  finalArmedState = finalStable;
 
   // Si al encender ya está cortado, no generar un falso evento de corte.
   cableEventSent = (cableStable == HIGH);
@@ -265,5 +275,5 @@ void loop() {
   updateTimer();
   updateButton();
   updateCable();
-  updateFinalButton();
+  updateFinalLever();
 }
