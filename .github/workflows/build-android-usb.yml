@@ -5,6 +5,16 @@ on:
   push:
     paths:
       - 'android/**'
+      - '0.png'
+      - '1.png'
+      - '2.png'
+      - '3.png'
+      - '4.png'
+      - '5.png'
+      - '6.png'
+      - '7.png'
+      - '8.png'
+      - '9.png'
       - '.github/workflows/build-android-usb.yml'
 
 jobs:
@@ -17,6 +27,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Prepare symbol assets
+        working-directory: .
+        shell: bash
+        run: |
+          mkdir -p android/app/src/main/assets/final/symbols
+          missing=0
+          for n in {0..9}; do
+            if [ -f "$n.png" ]; then
+              cp "$n.png" "android/app/src/main/assets/final/symbols/$n.png"
+            else
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            git fetch origin main --depth=1
+            for n in {0..9}; do
+              if [ ! -f "android/app/src/main/assets/final/symbols/$n.png" ]; then
+                git show "origin/main:$n.png" > "android/app/src/main/assets/final/symbols/$n.png"
+              fi
+            done
+          fi
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -38,3 +72,5 @@ jobs:
           name: bomba-usb-bridge-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+# Build relanzado tras corregir FinalActivity sin AndroidX.

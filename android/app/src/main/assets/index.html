@@ -2,39 +2,162 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Bomba USB Bridge</title>
-<style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111;color:#eee;font-family:system-ui,sans-serif}main{width:min(92vw,520px);padding:24px;border:1px solid #555;border-radius:14px;background:#1c1c1c}h1{margin:0 0 8px;font-size:1.4rem}p{opacity:.8}.status,.data{padding:12px;margin:12px 0;border:1px solid #555;border-radius:8px;font-family:monospace;white-space:pre-wrap;min-height:46px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}button{min-height:54px;font-size:1rem;font-weight:700;border-radius:9px;border:1px solid #777}#connect{grid-column:1/-1;background:#eee;color:#111}.small{font-size:.82rem;opacity:.65;margin-top:14px}
-</style>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Destructomatic T-47</title>
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
-<main>
-<h1>Nano · puente USB</h1>
-<p>Prueba nativa Android → OTG → Arduino Nano.</p>
-<div id="status" class="status">SIN CONECTAR</div>
-<div id="data" class="data">Sin datos del Nano.</div>
-<div class="grid">
-<button id="connect">CONECTAR NANO</button>
-<button data-cmd="INICIAR">INICIAR</button>
-<button data-cmd="PAUSA">PAUSA</button>
-<button data-cmd="RESET">RESET 90:45</button>
-<button data-cmd="ESTADO">PEDIR ESTADO</button>
+<div id="touchSurface" aria-hidden="true"></div>
+
+<div id="gameViewport">
+  <div id="gameFrame">
+    <section class="screen active" data-screen="idle">
+      <div class="eyebrow">DESTRUCTOMATIC T-47</div>
+      <h1>DISPOSITIVO ACTIVO</h1>
+      <button class="primary giant" id="callSquad">LLAME AL ESCUADRÓN ANTIBOMBAS PARA SILENCIAR</button>
+      <div class="statusline" id="usbMini">USB: SIN CONECTAR</div>
+    </section>
+
+    <section class="screen" data-screen="video">
+      <video id="soquetinVideo" playsinline preload="auto">
+        <source src="soquetin.mp4" type="video/mp4">
+      </video>
+      <div id="videoFallback" class="fallback hidden">
+        <h2>VIDEO DE SOQUETÍN</h2>
+        <p>Falta <b>soquetin.mp4</b> en assets.</p>
+      </div>
+      <div id="videoWait" class="waitBadge hidden">ESPERANDO EL BOTÓN...</div>
+    </section>
+
+    <section class="screen" data-screen="cables">
+      <div class="eyebrow">MÓDULO</div>
+      <h1>PALANCAS Y CABLES</h1>
+      <p class="instruction">CORTE EL CABLE CORRECTO</p>
+      <div class="pulseDot"></div>
+    </section>
+
+    <section class="screen" data-screen="symbols">
+      <div class="eyebrow">MÓDULO</div>
+      <h1>BOTONES DE SÍMBOLOS</h1>
+      <div id="symbolProgress" class="progressSlots"><span></span><span></span><span></span></div>
+      <div id="symbolGrid" class="symbolGrid"></div>
+    </section>
+
+    <section class="screen" data-screen="morse">
+      <div class="eyebrow">MÓDULO</div>
+      <h1>MORSE</h1>
+      <div id="morseDisplay" class="codeDisplay">&nbsp;</div>
+      <div id="keypad" class="keypad"></div>
+    </section>
+
+    <section class="screen" data-screen="lock">
+      <div class="eyebrow">MÓDULO</div>
+      <h1>CANDADO</h1>
+      <div id="letterPicker" class="letterPicker"></div>
+      <button class="primary" id="submitWord">ENVIAR</button>
+      <div id="wordFeedback" class="feedback"></div>
+    </section>
+
+    <section class="screen" data-screen="final">
+      <div class="eyebrow">ACCESO AUTORIZADO</div>
+      <h1>ABRA EL DISPOSITIVO</h1>
+      <p class="instruction">PULSE <b>DESATIBAR BONBA</b></p>
+      <div class="pulseDot"></div>
+    </section>
+
+    <section class="screen" data-screen="victory">
+      <div class="eyebrow">DIVISIÓN DE ARTEFACTOS EXPLOSIVOS RECREATIVOS</div>
+      <h1 class="success">BOMBA DESATIBADA</h1>
+      <p class="instruction">¡FELIZ CUMPLEAÑOS!</p>
+    </section>
+  </div>
 </div>
-<div class="small">La app usa USB nativo de Android; no depende de Web Serial de Chrome.</div>
-</main>
-<script>
-const statusEl=document.getElementById('status');
-const dataEl=document.getElementById('data');
-window.usbBridgeStatus=(s)=>statusEl.textContent=s;
-window.usbBridgeData=(d)=>dataEl.textContent=d;
-document.getElementById('connect').onclick=()=>{
-  if(window.AndroidUsb) AndroidUsb.connect();
-  else statusEl.textContent='PUENTE ANDROID NO DISPONIBLE';
-};
-document.querySelectorAll('[data-cmd]').forEach(b=>b.onclick=()=>{
-  if(window.AndroidUsb) AndroidUsb.send(b.dataset.cmd);
-});
-</script>
+
+<div id="admin" class="admin hidden">
+  <div class="adminHeader">
+    <h2>ADMIN · COCHINOCA</h2>
+    <button id="closeAdmin">CERRAR</button>
+  </div>
+
+  <div class="adminGrid">
+    <section class="adminCard">
+      <h3>EXPERIENCIA</h3>
+      <button id="adminStart" class="accent">INICIAR EXPERIENCIA</button>
+      <button id="adminReset">RESET TOTAL</button>
+      <div class="jumpGrid" id="jumpGrid"></div>
+    </section>
+
+    <section class="adminCard">
+      <h3>USB / EVENTOS</h3>
+      <div id="adminUsbStatus" class="adminStatus">SIN CONECTAR</div>
+      <button id="connectUsb">CONECTAR NANO</button>
+      <button data-sim="BUTTON">SIMULAR BOTÓN</button>
+      <button data-sim="CABLE_OK">SIMULAR CORTE</button>
+      <button data-cmd="ESTADO">PEDIR ESTADO</button>
+    </section>
+
+    <section class="adminCard">
+      <h3>CONTADOR</h3>
+      <div class="timeRow">
+        <input id="timeMin" type="number" min="0" max="99" value="30">
+        <span>:</span>
+        <input id="timeSec" type="number" min="0" max="59" value="00">
+      </div>
+      <div class="buttonRow">
+        <button id="timerSet">FIJAR</button>
+        <button data-cmd="INICIAR">START</button>
+        <button data-cmd="PAUSA">PAUSA</button>
+      </div>
+      <div class="buttonRow">
+        <button id="timerMinus">−1 MIN</button>
+        <button id="timerPlus">+1 MIN</button>
+      </div>
+    </section>
+
+    <section class="adminCard">
+      <h3>PAUSA DEL VIDEO</h3>
+      <div class="timeRow">
+        <input id="pauseSecond" type="number" min="0" step="0.1">
+        <span>seg</span>
+      </div>
+      <div class="buttonRow">
+        <button data-pause="-1">−1 s</button>
+        <button data-pause="-0.1">−0.1</button>
+        <button data-pause="0.1">+0.1</button>
+        <button data-pause="1">+1 s</button>
+      </div>
+      <button id="testPause">PROBAR PAUSA</button>
+    </section>
+
+    <section class="adminCard calibration">
+      <h3>CALIBRACIÓN DE PANTALLA</h3>
+      <p>Mové y escalá el contenido hasta que quede dentro del agujero de la lonchera.</p>
+      <div class="calValue">X <span id="xVal"></span> · Y <span id="yVal"></span> · ESCALA <span id="scaleVal"></span></div>
+      <div class="dpad">
+        <span></span><button data-nudge="y,-5">▲</button><span></span>
+        <button data-nudge="x,-5">◀</button><button id="calReset">RESET</button><button data-nudge="x,5">▶</button>
+        <span></span><button data-nudge="y,5">▼</button><span></span>
+      </div>
+      <div class="buttonRow">
+        <button data-scale="-0.02">ACHICAR</button>
+        <button data-scale="0.02">AGRANDAR</button>
+      </div>
+      <label><input type="checkbox" id="showGuide"> Mostrar marco de referencia</label>
+    </section>
+
+    <section class="adminCard">
+      <h3>DIAGNÓSTICO</h3>
+      <div id="serialLog" class="serialLog">Sin datos.</div>
+      <button id="clearLog">LIMPIAR LOG</button>
+    </section>
+  </div>
+</div>
+
+<audio id="pipAudio" src="pip.mp3" preload="auto" loop></audio>
+<audio id="musicAudio" src="musica.mp3" preload="auto" loop></audio>
+<audio id="victoryAudio" src="victoria.mp3" preload="auto"></audio>
+<audio id="birthdayAudio" src="cumple.mp3" preload="auto"></audio>
+
+<script src="app.js"></script>
 </body>
 </html>
