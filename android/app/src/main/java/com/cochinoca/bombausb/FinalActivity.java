@@ -168,11 +168,14 @@ public class FinalActivity extends Activity implements SerialInputOutputManager.
 
     private boolean validMediaSlot(String slot) {
         return slot != null && (slot.equals("soquetin") || slot.equals("pip") || slot.equals("musica") ||
-                slot.equals("victoria") || slot.equals("cumple") || slot.equals("error") || slot.equals("boom"));
+                slot.equals("victoria") || slot.equals("cumple") || slot.equals("error") ||
+                slot.equals("correct") || slot.equals("boom"));
     }
 
     private String mediaExtension(String slot) {
-        return "soquetin".equals(slot) ? ".mp4" : ".mp3";
+        if ("soquetin".equals(slot)) return ".mp4";
+        if ("correct".equals(slot)) return ".wav";
+        return ".mp3";
     }
 
     private File mediaFile(String slot) {
